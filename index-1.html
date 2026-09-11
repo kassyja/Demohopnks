@@ -1,0 +1,1083 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HOPCHAFE — ระบบหลังบ้าน</title>
+<link href="https://fonts.googleapis.com/css2?family=Mitr:wght@400;500;600;700&family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-database-compat.js"></script>
+<style>
+  :root{
+    --bg:#F7F8FA;
+    --white:#FFFFFF;
+    --ink:#1C2B2E;
+    --muted:#6B7A7D;
+    --muted-soft:#9AA6A8;
+    --line:#E7EBEC;
+    --accent:#0E9594;
+    --accent-dark:#0B6E6D;
+    --accent-tint:#EAF6F5;
+    --danger:#D5473A;
+    --danger-tint:#FCEAE8;
+    --warn:#B8860B;
+    --warn-tint:#FFF6E0;
+    --r-sm:8px; --r-md:12px; --r-lg:16px;
+    --shadow:0 1px 2px rgba(28,43,46,.06), 0 1px 8px rgba(28,43,46,.04);
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);font-family:'Sarabun',Arial,sans-serif;font-size:14.5px;}
+  h1,h2,h3{font-family:'Mitr',Arial,sans-serif;margin:0;}
+  button,input,select{font-family:inherit;}
+  a{color:inherit;}
+
+  /* ===== PIN Gate ===== */
+  #pinGate{position:fixed;inset:0;background:var(--ink);display:flex;align-items:center;justify-content:center;z-index:200;}
+  .pin-box{background:var(--white);border-radius:var(--r-lg);padding:32px;width:320px;max-width:90vw;text-align:center;box-shadow:var(--shadow);}
+  .pin-box h2{font-size:18px;margin-bottom:6px;}
+  .pin-box p{font-size:13px;color:var(--muted);margin:0 0 16px;}
+  .pin-box input{width:100%;text-align:center;font-size:26px;letter-spacing:11px;padding:11px;border:1.5px solid var(--line);border-radius:var(--r-sm);font-family:'Mitr',Arial,sans-serif;background:#FCFCFC;}
+  .pin-box button{width:100%;margin-top:14px;padding:11px;border:none;border-radius:var(--r-sm);background:var(--accent);color:#fff;font-weight:700;font-size:14.5px;cursor:pointer;}
+  .pin-err{color:var(--danger);font-size:12.5px;margin-top:8px;min-height:16px;}
+
+  /* ===== App shell ===== */
+  #app{display:none;}
+  .shell{display:flex;min-height:100vh;}
+  .sidebar{width:210px;flex:0 0 210px;background:var(--white);border-right:1px solid var(--line);display:flex;flex-direction:column;position:sticky;top:0;height:100vh;overflow-y:auto;}
+  .sidebar-brand{padding:20px 18px 14px;}
+  .sidebar-brand .name{font-family:'Mitr',Arial,sans-serif;font-weight:700;font-size:15.5px;color:var(--ink);}
+  .sidebar-brand .sub{font-size:11px;color:var(--muted-soft);margin-top:2px;}
+  .nav-list{flex:1;padding:6px 10px;}
+  .nav-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:var(--r-sm);cursor:pointer;color:var(--muted);font-weight:600;font-size:13.5px;margin-bottom:2px;}
+  .nav-item:hover{background:var(--bg);color:var(--ink);}
+  .nav-item.active{background:var(--accent-tint);color:var(--accent-dark);}
+  .nav-item .ic{width:18px;text-align:center;font-size:14.5px;}
+  .sidebar-foot{padding:14px 18px;border-top:1px solid var(--line);}
+  .conn-status{font-size:11px;color:var(--muted-soft);margin-bottom:8px;}
+  .logout-link{font-size:12.5px;color:var(--muted);cursor:pointer;font-weight:600;}
+  .logout-link:hover{color:var(--danger);}
+
+  .main{flex:1;min-width:0;}
+  .page-header{padding:22px 28px 6px;}
+  .page-header h1{font-size:20px;}
+  .page-header .desc{font-size:13px;color:var(--muted);margin-top:3px;}
+  .page-body{padding:16px 28px 40px;}
+  .page{display:none;}
+  .page.active{display:block;}
+
+  /* ===== Cards / grid ===== */
+  .card{background:var(--white);border:1px solid var(--line);border-radius:var(--r-lg);padding:18px;margin-bottom:16px;box-shadow:var(--shadow);}
+  .card h3{font-size:14.5px;margin-bottom:12px;color:var(--ink);}
+  .card .card-sub{font-size:12px;color:var(--muted);margin-top:-8px;margin-bottom:12px;}
+  .stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px;margin-bottom:16px;}
+  .stat-card{background:var(--white);border:1px solid var(--line);border-radius:var(--r-lg);padding:16px 18px;box-shadow:var(--shadow);}
+  .stat-card .num{font-family:'Mitr',Arial,sans-serif;font-size:25px;font-weight:700;color:var(--ink);}
+  .stat-card .num.accent{color:var(--accent-dark);}
+  .stat-card .lbl{font-size:12px;color:var(--muted);margin-top:3px;}
+  .two-col{display:grid;grid-template-columns:1.3fr 1fr;gap:16px;}
+  .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+  @media (max-width:900px){ .two-col,.grid-2{grid-template-columns:1fr;} }
+
+  table{width:100%;border-collapse:collapse;font-size:13px;}
+  th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);}
+  th{color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.3px;font-weight:700;}
+  td.num,th.num{text-align:right;}
+  tr.clickable{cursor:pointer;}
+  tr.clickable:hover{background:var(--bg);}
+  .empty-msg{text-align:center;color:var(--muted-soft);padding:26px;font-size:13px;}
+
+  .btn{font-weight:700;font-size:13px;padding:9px 15px;border-radius:var(--r-sm);border:1.5px solid var(--line);cursor:pointer;background:#fff;color:var(--ink);}
+  .btn-primary{background:var(--accent);border-color:var(--accent);color:#fff;}
+  .btn-primary:hover{background:var(--accent-dark);}
+  .btn-danger{background:var(--danger);border-color:var(--danger);color:#fff;}
+  .btn-ghost{background:#fff;}
+  .btn-ghost:hover{background:var(--bg);}
+  .btn:disabled{opacity:.5;cursor:not-allowed;}
+
+  .filter-row{display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;margin-bottom:14px;}
+  .field{display:flex;flex-direction:column;gap:4px;}
+  .field label{font-size:11.5px;color:var(--muted);font-weight:700;}
+  .field input,.field select{padding:8px 10px;border:1.5px solid var(--line);border-radius:var(--r-sm);font-size:13px;background:#FCFCFC;}
+  .chip-row{display:flex;gap:6px;flex-wrap:wrap;}
+  .chip{padding:7px 13px;border-radius:999px;border:1.5px solid var(--line);background:#fff;font-size:12px;font-weight:700;cursor:pointer;color:var(--ink);}
+  .chip.active{background:var(--accent);border-color:var(--accent);color:#fff;}
+
+  .badge{display:inline-block;padding:2px 9px;border-radius:999px;font-size:10.5px;font-weight:700;}
+  .badge-pending{background:var(--warn-tint);color:var(--warn);}
+  .badge-cancelled{background:var(--danger-tint);color:var(--danger);}
+  .badge-ok{background:var(--accent-tint);color:var(--accent-dark);}
+  .badge-edited{background:#EAF0FF;color:#3454B4;}
+
+  /* ===== Menu / Stock read-only cards ===== */
+  .menu-card-ro{display:flex;align-items:center;gap:12px;padding:10px;border:1px solid var(--line);border-radius:var(--r-md);background:#fff;}
+  .menu-card-ro img{width:52px;height:52px;border-radius:var(--r-sm);object-fit:cover;background:var(--bg);flex:0 0 auto;}
+  .menu-card-ro .ph{width:52px;height:52px;border-radius:var(--r-sm);background:var(--bg);display:flex;align-items:center;justify-content:center;font-size:20px;flex:0 0 auto;}
+  .menu-card-ro .nm{font-weight:700;font-size:13.5px;}
+  .menu-card-ro .cat{font-size:11.5px;color:var(--muted-soft);}
+  .menu-card-ro .pr{margin-left:auto;font-weight:700;color:var(--accent-dark);font-size:13.5px;}
+  .menu-grid-ro{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px;}
+
+  /* ===== Chart ===== */
+  .chart-wrap{overflow-x:auto;}
+  .bar-chart{display:flex;align-items:flex-end;gap:8px;height:150px;min-width:100%;padding-top:10px;}
+  .bar-col{display:flex;flex-direction:column;align-items:center;flex:1;min-width:26px;height:100%;justify-content:flex-end;}
+  .bar-fill{width:100%;max-width:34px;background:var(--accent);border-radius:5px 5px 0 0;transition:height .2s;}
+  .bar-val{font-size:10px;color:var(--muted);margin-bottom:3px;}
+  .bar-lbl{font-size:10.5px;color:var(--muted-soft);margin-top:6px;white-space:nowrap;}
+
+  /* ===== Modal ===== */
+  .modal-overlay{display:none;position:fixed;inset:0;background:rgba(28,43,46,.5);align-items:center;justify-content:center;padding:16px;z-index:90;}
+  .modal-overlay.open{display:flex;}
+  .modal-box{background:#fff;border-radius:var(--r-lg);padding:22px;max-width:560px;width:100%;max-height:88vh;overflow-y:auto;}
+  .modal-box h2{font-size:16.5px;margin-bottom:14px;}
+  .modal-actions{display:flex;gap:10px;margin-top:16px;}
+  .warn-box{background:var(--warn-tint);color:#8A6A16;border-radius:var(--r-sm);padding:10px 12px;font-size:12px;margin-bottom:14px;}
+  .item-edit-row{display:grid;grid-template-columns:2fr 70px 90px;gap:6px;align-items:center;margin-bottom:6px;}
+  .item-edit-row input{padding:7px 8px;border:1px solid var(--line);border-radius:8px;font-size:13px;}
+
+  .toast{position:fixed;bottom:24px;left:50%;transform:translate(-50%,12px);background:var(--ink);color:#fff;padding:11px 20px;border-radius:999px;font-size:13.5px;opacity:0;pointer-events:none;transition:opacity .25s,transform .25s;z-index:300;max-width:90%;text-align:center;}
+  .toast.show{opacity:1;transform:translate(-50%,0);}
+
+  @media (max-width:760px){
+    .shell{flex-direction:column;}
+    .sidebar{width:100%;flex:none;height:auto;position:sticky;top:0;flex-direction:row;overflow-x:auto;z-index:30;}
+    .sidebar-brand{display:none;}
+    .nav-list{display:flex;padding:8px;}
+    .nav-item{white-space:nowrap;margin-bottom:0;}
+    .sidebar-foot{display:none;}
+    .page-header{padding:16px 16px 4px;}
+    .page-body{padding:12px 16px 30px;}
+  }
+</style>
+</head>
+<body>
+
+<div id="pinGate">
+  <div class="pin-box">
+    <h2>🔒 ระบบหลังบ้าน HOPCHAFE</h2>
+    <p>กรอกรหัสผ่านเพื่อเข้าใช้งาน</p>
+    <input id="pinInput" type="password" inputmode="numeric" maxlength="6" placeholder="••••">
+    <button id="pinSubmitBtn">เข้าสู่ระบบ</button>
+    <div class="pin-err" id="pinErr"></div>
+  </div>
+</div>
+
+<div id="app">
+  <div class="shell">
+    <aside class="sidebar">
+      <div class="sidebar-brand">
+        <div class="name">🧋 HOPCHAFE</div>
+        <div class="sub">ระบบหลังบ้าน</div>
+      </div>
+      <nav class="nav-list">
+        <div class="nav-item active" data-page="dashboard"><span class="ic">🏠</span><span>หน้าหลัก</span></div>
+        <div class="nav-item" data-page="bills"><span class="ic">🧾</span><span>ใบเสร็จ</span></div>
+        <div class="nav-item" data-page="members"><span class="ic">🎫</span><span>สมาชิก</span></div>
+        <div class="nav-item" data-page="menu"><span class="ic">🍹</span><span>เมนู</span></div>
+        <div class="nav-item" data-page="stock"><span class="ic">📦</span><span>สต็อก</span></div>
+        <div class="nav-item" data-page="reports"><span class="ic">📊</span><span>รายงาน</span></div>
+        <div class="nav-item" data-page="settings"><span class="ic">⚙️</span><span>ตั้งค่า</span></div>
+      </nav>
+      <div class="sidebar-foot">
+        <div class="conn-status" id="connStatus">⏳ กำลังเชื่อมต่อ...</div>
+        <div class="logout-link" id="logoutBtn">ออกจากระบบ</div>
+      </div>
+    </aside>
+
+    <main class="main">
+
+      <!-- ===== หน้าหลัก (Dashboard) ===== -->
+      <section class="page active" id="page-dashboard">
+        <div class="page-header"><h1>หน้าหลัก</h1><div class="desc" id="dashDateLabel"></div></div>
+        <div class="page-body">
+          <div class="stat-grid">
+            <div class="stat-card"><div class="num accent" id="dRevenue">0.00</div><div class="lbl">ยอดขายวันนี้ (บาท)</div></div>
+            <div class="stat-card"><div class="num" id="dCups">0</div><div class="lbl">จำนวนแก้ว</div></div>
+            <div class="stat-card"><div class="num" id="dBills">0</div><div class="lbl">จำนวนบิล</div></div>
+            <div class="stat-card"><div class="num" id="dAvg">0.00</div><div class="lbl">ยอดเฉลี่ย/บิล</div></div>
+          </div>
+          <div class="two-col">
+            <div class="card">
+              <h3>ยอดขาย 7 วันล่าสุด</h3>
+              <div class="chart-wrap"><div class="bar-chart" id="dChart"></div></div>
+            </div>
+            <div class="card">
+              <h3>ช่วงเวลาขายดีวันนี้</h3>
+              <table><thead><tr><th>ช่วงเวลา</th><th class="num">บิล</th></tr></thead><tbody id="dHourBody"></tbody></table>
+            </div>
+          </div>
+          <div class="card">
+            <h3>🔥 เมนูขายดีวันนี้</h3>
+            <table><thead><tr><th>#</th><th>เมนู</th><th class="num">แก้ว</th><th class="num">ยอดขาย</th></tr></thead><tbody id="dTopMenuBody"></tbody></table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===== ใบเสร็จ ===== -->
+      <section class="page" id="page-bills">
+        <div class="page-header"><h1>ใบเสร็จ</h1><div class="desc">ดูย้อนหลังและแก้ไขบิลได้</div></div>
+        <div class="page-body">
+          <div class="card">
+            <div class="filter-row">
+              <div class="field"><label>จากวันที่</label><input id="billStart" type="date"></div>
+              <div class="field"><label>ถึงวันที่</label><input id="billEnd" type="date"></div>
+              <div class="field"><label>ค้นหา (เลขบิล/รายการ)</label><input id="billSearch" type="text" placeholder="เช่น 015 หรือ ชาไทย"></div>
+              <button class="btn btn-primary" id="billLoadBtn">📥 โหลดข้อมูลช่วงนี้</button>
+            </div>
+          </div>
+          <div class="card">
+            <table><thead><tr><th>เลขบิล</th><th>เวลา</th><th>รายการ</th><th>ชำระ</th><th class="num">ยอดรวม</th><th>สถานะ</th></tr></thead><tbody id="billListBody"></tbody></table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===== สมาชิก ===== -->
+      <section class="page" id="page-members">
+        <div class="page-header"><h1>สมาชิก</h1><div class="desc">ค้นหา ดูแต้ม และจัดการสมาชิก</div></div>
+        <div class="page-body">
+          <div class="card">
+            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:10px;">
+              <h3 style="margin:0;">รายชื่อสมาชิก</h3>
+              <button type="button" id="memberAddBtn" class="btn btn-primary">+ เพิ่มสมาชิกใหม่</button>
+            </div>
+            <input id="memberSearchInput" type="text" placeholder="ค้นหาด้วยชื่อหรือเบอร์โทร..." style="width:100%;padding:9px 12px;border:1.5px solid var(--line);border-radius:var(--r-sm);margin-bottom:10px;">
+            <table><thead><tr><th>ชื่อ</th><th>เบอร์โทร</th><th class="num">แต้มปัจจุบัน</th></tr></thead><tbody id="membersListBody"></tbody></table>
+          </div>
+          <div class="card" id="memberHistoryCard" style="display:none;">
+            <h3 id="memberHistoryTitle">ประวัติแต้ม & การซื้อ</h3>
+            <div class="card-sub">ทุกครั้งที่มีรายการ "ได้แต้ม" หมายถึงสมาชิกคนนี้ถูกเช็คเบอร์และซื้อของในบิลนั้นด้วย</div>
+            <div id="memberHistoryBox"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===== เมนู (ดูอย่างเดียว) ===== -->
+      <section class="page" id="page-menu">
+        <div class="page-header"><h1>เมนู</h1><div class="desc">ดูรายการเมนูปัจจุบัน (แก้ไขเมนูที่หน้าจัดการเมนูในระบบ POS)</div></div>
+        <div class="page-body">
+          <div class="card">
+            <div class="menu-grid-ro" id="menuListBox"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===== สต็อก (ดูอย่างเดียว) ===== -->
+      <section class="page" id="page-stock">
+        <div class="page-header"><h1>สต็อก</h1><div class="desc">ดูประวัติการบันทึกสต็อก (บันทึกสต็อกใหม่ที่หน้าสต็อกในระบบ POS)</div></div>
+        <div class="page-body">
+          <div class="card">
+            <table><thead><tr><th>วันที่</th><th>ผู้บันทึก</th><th>เวลาบันทึก</th><th></th></tr></thead><tbody id="stockListBody"></tbody></table>
+          </div>
+          <div class="card" id="stockDetailCard" style="display:none;">
+            <h3 id="stockDetailTitle">รายละเอียดสต็อก</h3>
+            <table><thead><tr><th>รายการ</th><th class="num">จำนวนคงเหลือ</th></tr></thead><tbody id="stockDetailBody"></tbody></table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===== รายงาน ===== -->
+      <section class="page" id="page-reports">
+        <div class="page-header"><h1>รายงาน</h1><div class="desc">สรุปยอดขายเจาะลึกตามช่วงเวลาที่เลือก</div></div>
+        <div class="page-body">
+          <div class="card">
+            <div class="filter-row">
+              <div class="field"><label>จากวันที่</label><input id="statStart" type="date"></div>
+              <div class="field"><label>ถึงวันที่</label><input id="statEnd" type="date"></div>
+              <div class="chip-row" id="statQuick">
+                <button type="button" class="chip active" data-range="today">วันนี้</button>
+                <button type="button" class="chip" data-range="week">7 วัน</button>
+                <button type="button" class="chip" data-range="month">30 วัน</button>
+              </div>
+              <button class="btn btn-primary" id="statLoadBtn" style="margin-left:auto;">📥 โหลดข้อมูลช่วงนี้</button>
+              <button class="btn btn-ghost" id="exportCsvBtn">⬇️ Export CSV</button>
+            </div>
+          </div>
+          <div class="stat-grid">
+            <div class="stat-card"><div class="num accent" id="statRevenue">0.00</div><div class="lbl">ยอดขายรวม (บาท)</div></div>
+            <div class="stat-card"><div class="num" id="statExpense">0.00</div><div class="lbl">รายจ่ายรวม (บาท)</div></div>
+            <div class="stat-card"><div class="num" id="statNet">0.00</div><div class="lbl">กำไรสุทธิ (บาท)</div></div>
+            <div class="stat-card"><div class="num" id="statBills">0</div><div class="lbl">จำนวนบิล</div></div>
+            <div class="stat-card"><div class="num" id="statCups">0</div><div class="lbl">จำนวนแก้ว</div></div>
+          </div>
+          <div class="two-col">
+            <div class="card"><h3>🧋 ยอดขายแยกตามเมนู</h3><table><thead><tr><th>เมนู</th><th class="num">แก้ว</th><th class="num">ยอดขาย</th></tr></thead><tbody id="statMenuBody"></tbody></table></div>
+            <div class="card"><h3>💰 ยอดขายแยกตามราคา</h3><table><thead><tr><th>ราคา</th><th class="num">แก้ว</th><th class="num">ยอดขาย</th></tr></thead><tbody id="statPriceBody"></tbody></table></div>
+            <div class="card"><h3>🍯 ยอดขายแยกตามความหวาน</h3><table><thead><tr><th>ความหวาน</th><th class="num">แก้ว</th></tr></thead><tbody id="statSweetBody"></tbody></table></div>
+            <div class="card"><h3>🕐 ยอดขายแยกตามช่วงเวลา</h3><table><thead><tr><th>ช่วงเวลา</th><th class="num">บิล</th><th class="num">ยอดขาย</th></tr></thead><tbody id="statHourBody"></tbody></table></div>
+          </div>
+          <div class="card">
+            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:10px;">
+              <h3 style="margin:0;">💸 รายจ่าย</h3>
+              <button class="btn btn-primary" id="expenseAddBtn">+ เพิ่มรายจ่าย</button>
+            </div>
+            <table><thead><tr><th>วันที่</th><th>หมวด</th><th>รายละเอียด</th><th class="num">จำนวนเงิน</th><th></th></tr></thead><tbody id="expenseBody"></tbody></table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===== ตั้งค่า ===== -->
+      <section class="page" id="page-settings">
+        <div class="page-header"><h1>ตั้งค่า</h1><div class="desc">อัตราแต้มสะสมของร้าน</div></div>
+        <div class="page-body">
+          <div class="card" style="max-width:480px;">
+            <h3>ระบบแต้มสะสม</h3>
+            <div class="field" style="margin-bottom:10px;"><label>1 แก้ว ได้กี่แต้ม</label><input id="pointsPerCupInput" type="number" min="0" step="1" style="width:100%;padding:9px 10px;border:1.5px solid var(--line);border-radius:var(--r-sm);"></div>
+            <div class="field" style="margin-bottom:10px;"><label>ใช้กี่แต้มต่อ 1 คูปอง</label><input id="couponPointCostInput" type="number" min="1" step="1" style="width:100%;padding:9px 10px;border:1.5px solid var(--line);border-radius:var(--r-sm);"></div>
+            <div class="field" style="margin-bottom:14px;"><label>คูปองลดกี่บาท</label><input id="couponDiscountBahtInput" type="number" min="0" step="1" style="width:100%;padding:9px 10px;border:1.5px solid var(--line);border-radius:var(--r-sm);"></div>
+            <button type="button" id="savePointsRateBtn" class="btn btn-primary">บันทึกอัตราแต้ม</button>
+          </div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+</div>
+
+<!-- ===== Modal: รายละเอียด/แก้ไขบิล ===== -->
+<div id="billModal" class="modal-overlay">
+  <div class="modal-box">
+    <h2 id="billModalTitle">รายละเอียดบิล</h2>
+    <div class="warn-box">⚠️ การแก้ไขบิลจะไม่กระทบแต้มสมาชิกที่ให้ไปแล้วโดยอัตโนมัติ ถ้าต้องปรับแต้ม ให้ไปปรับที่หน้า "สมาชิก" แยกต่างหาก</div>
+    <div id="billModalBody"></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" id="billCloseBtn">ปิด</button>
+      <button class="btn btn-danger" id="billCancelToggleBtn"></button>
+      <button class="btn btn-primary" id="billSaveBtn" style="margin-left:auto;">บันทึกการแก้ไข</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== Modal: เพิ่มรายจ่าย ===== -->
+<div id="expenseModal" class="modal-overlay">
+  <div class="modal-box" style="max-width:420px;">
+    <h2>💸 เพิ่มรายจ่าย</h2>
+    <div class="field" style="margin-bottom:10px;"><label>วันที่</label><input id="expDate" type="date" style="width:100%;padding:9px 10px;border:1.5px solid var(--line);border-radius:var(--r-sm);"></div>
+    <div class="field" style="margin-bottom:10px;"><label>หมวดหมู่</label>
+      <select id="expCategory" style="width:100%;padding:9px 10px;border:1.5px solid var(--line);border-radius:var(--r-sm);">
+        <option>วัตถุดิบ</option><option>บรรจุภัณฑ์</option><option>ค่าเช่า</option><option>ค่าแรง</option><option>ค่าน้ำ/ไฟ</option><option>อื่นๆ</option>
+      </select>
+    </div>
+    <div class="field" style="margin-bottom:10px;"><label>รายละเอียด</label><input id="expNote" type="text" style="width:100%;padding:9px 10px;border:1.5px solid var(--line);border-radius:var(--r-sm);"></div>
+    <div class="field" style="margin-bottom:10px;"><label>จำนวนเงิน (บาท)</label><input id="expAmount" type="number" min="0" step="0.01" style="width:100%;padding:9px 10px;border:1.5px solid var(--line);border-radius:var(--r-sm);"></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" id="expCancelBtn">ยกเลิก</button>
+      <button class="btn btn-primary" id="expSaveBtn">บันทึก</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== Modal: ลงทะเบียนสมาชิกใหม่ ===== -->
+<div id="memberRegisterModal" class="modal-overlay">
+  <div class="modal-box" style="max-width:420px;">
+    <h2>🎫 ลงทะเบียนสมาชิกใหม่</h2>
+    <div class="field" style="margin-bottom:10px;"><label>ชื่อลูกค้า</label><input id="memberRegName" type="text" style="width:100%;padding:9px 10px;border:1.5px solid var(--line);border-radius:var(--r-sm);"></div>
+    <div class="field" style="margin-bottom:10px;"><label>เบอร์โทร</label><input id="memberRegPhone" type="tel" style="width:100%;padding:9px 10px;border:1.5px solid var(--line);border-radius:var(--r-sm);"></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" id="memberRegCancelBtn">ยกเลิก</button>
+      <button class="btn btn-primary" id="memberRegConfirmBtn">ลงทะเบียน</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== Modal: ปรับแต้มมือ ===== -->
+<div id="memberAdjustModal" class="modal-overlay">
+  <div class="modal-box" style="max-width:420px;">
+    <h2>✏️ ปรับแต้มสมาชิก</h2>
+    <p id="memberAdjustWho" style="font-size:13px;color:var(--muted);margin:0 0 12px;"></p>
+    <div class="field" style="margin-bottom:10px;"><label>จำนวนแต้ม (ใส่ - หน้าตัวเลขถ้าต้องการหักออก)</label><input id="memberAdjustAmount" type="number" step="1" style="width:100%;padding:9px 10px;border:1.5px solid var(--line);border-radius:var(--r-sm);"></div>
+    <div class="field" style="margin-bottom:10px;"><label>เหตุผล</label><input id="memberAdjustReason" type="text" style="width:100%;padding:9px 10px;border:1.5px solid var(--line);border-radius:var(--r-sm);"></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" id="memberAdjustCancelBtn">ยกเลิก</button>
+      <button class="btn btn-primary" id="memberAdjustConfirmBtn">บันทึก</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== Modal: แก้ไขข้อมูลสมาชิก ===== -->
+<div id="memberEditModal" class="modal-overlay">
+  <div class="modal-box" style="max-width:420px;">
+    <h2>📝 แก้ไขข้อมูลสมาชิก</h2>
+    <div class="field" style="margin-bottom:10px;"><label>ชื่อ</label><input id="memberEditName" type="text" style="width:100%;padding:9px 10px;border:1.5px solid var(--line);border-radius:var(--r-sm);"></div>
+    <div class="field" style="margin-bottom:10px;"><label>เบอร์โทร</label><input id="memberEditPhone" type="tel" style="width:100%;padding:9px 10px;border:1.5px solid var(--line);border-radius:var(--r-sm);"></div>
+    <div class="field" style="margin-bottom:10px;"><label>แต้มคงเหลือ</label><input id="memberEditPoints" type="number" min="0" step="1" style="width:100%;padding:9px 10px;border:1.5px solid var(--line);border-radius:var(--r-sm);"></div>
+    <div style="font-size:11.5px;color:var(--muted);margin-bottom:10px;">ถ้าแก้จำนวนแต้ม ระบบจะบันทึกเป็นรายการ "ปรับมือ" ในประวัติให้อัตโนมัติ</div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" id="memberEditCancelBtn">ยกเลิก</button>
+      <button class="btn btn-primary" id="memberEditConfirmBtn">บันทึกการแก้ไข</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ============================================================
+   HOPCHAFE Admin Panel v2 — อ่าน/แก้ไขฐานข้อมูล Firebase เดียวกับระบบ POS
+   ไม่มีการเปลี่ยนโครงสร้างข้อมูลเดิมใดๆ ทั้งสิ้น
+   ============================================================ */
+const firebaseConfig = {
+  apiKey: "AIzaSyA5jVV1QIW9Yg0StcCbWJJoBSIUvk0Y7_g",
+  authDomain: "hopchafeposnong.firebaseapp.com",
+  databaseURL: "https://hopchafeposnong-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "hopchafeposnong",
+  storageBucket: "hopchafeposnong.firebasestorage.app",
+  messagingSenderId: "550804618797",
+  appId: "1:550804618797:web:74dce0a46a209eec7d02a4"
+};
+const PIN_CODE = '1212';
+
+let fbDb = null;
+let config = { menu:[], toppings:[], pointsPerCup:1, couponPointCost:10, couponDiscountBaht:20 };
+let salesRecords = [];
+let expenses = {};
+let members = {};
+let stockRecords = [];
+let loadedSalesRanges = new Set();
+
+function escapeHtml(str){ return String(str==null?'':str).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c])); }
+function showToast(msg){
+  const el = document.getElementById('toast');
+  el.textContent = msg; el.classList.add('show');
+  clearTimeout(el._t); el._t = setTimeout(()=>el.classList.remove('show'), 2400);
+}
+function todayStr(){ const d=new Date(); return dateStr(d); }
+function dateStr(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function localDateStr(iso){ if(!iso) return ''; return dateStr(new Date(iso)); }
+function genId(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,8); }
+function normalizePhone(raw){
+  let d = String(raw||'').replace(/\D/g,'');
+  if(d.startsWith('66')){ d = d.slice(2); if(!d.startsWith('0')) d = '0'+d; }
+  else if(d.length===9 && !d.startsWith('0')) d = '0'+d;
+  return d;
+}
+function lineBaseTotal(line){
+  if(line.baseTotal != null) return line.baseTotal;
+  if(line.unitPrice != null && line.toppingsTotal != null) return (line.unitPrice*line.qty) - line.toppingsTotal;
+  return line.lineTotal;
+}
+function lineMenuPrice(line){
+  if(line.menuPrice != null) return line.menuPrice;
+  const m = (config.menu||[]).find(x=>x.name===line.name);
+  if(m) return m.price;
+  return line.baseUnitPrice != null ? line.baseUnitPrice : line.unitPrice;
+}
+
+/* ============ PIN Gate ============ */
+document.getElementById('pinSubmitBtn').onclick = tryPin;
+document.getElementById('pinInput').addEventListener('keydown', e=>{ if(e.key==='Enter') tryPin(); });
+function tryPin(){
+  const v = document.getElementById('pinInput').value;
+  if(v === PIN_CODE){
+    sessionStorage.setItem('admin_authed','1');
+    document.getElementById('pinGate').style.display='none';
+    document.getElementById('app').style.display='block';
+    boot();
+  } else {
+    document.getElementById('pinErr').textContent = 'รหัสไม่ถูกต้อง';
+    document.getElementById('pinInput').value='';
+  }
+}
+document.getElementById('logoutBtn').onclick = ()=>{
+  sessionStorage.removeItem('admin_authed');
+  location.reload();
+};
+if(sessionStorage.getItem('admin_authed')==='1'){
+  document.getElementById('pinGate').style.display='none';
+  document.getElementById('app').style.display='block';
+  window.addEventListener('DOMContentLoaded', boot);
+}
+
+/* ============ Navigation (แต่ละเมนูแยกเป็นหน้าของตัวเอง) ============ */
+document.querySelectorAll('.nav-item').forEach(item=>{
+  item.onclick = ()=>switchPage(item.dataset.page);
+});
+function switchPage(page){
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.toggle('active', n.dataset.page===page));
+  document.querySelectorAll('.page').forEach(p=>p.classList.toggle('active', p.id==='page-'+page));
+  if(page==='dashboard') renderDashboard();
+  if(page==='menu') renderMenuPage();
+  if(page==='stock') renderStockPage();
+}
+
+/* ============ Boot / Firebase init ============ */
+function boot(){
+  try{
+    firebase.initializeApp(firebaseConfig);
+    fbDb = firebase.database();
+    firebase.auth().signInAnonymously().then(()=>{
+      document.getElementById('connStatus').textContent = '🟢 เชื่อมต่อสำเร็จ';
+      attachListeners();
+      const today = todayStr();
+      document.getElementById('statStart').value = today;
+      document.getElementById('statEnd').value = today;
+      document.getElementById('billStart').value = today;
+      document.getElementById('billEnd').value = today;
+      // โหลดข้อมูล 7 วันล่าสุดทันทีตอนเปิดเว็บ เพื่อให้หน้าหลักเห็นภาพรวมได้ทันที ไม่ต้องกดโหลดเอง
+      const weekAgo = new Date(); weekAgo.setDate(weekAgo.getDate()-6);
+      loadSalesRange(dateStr(weekAgo), today).then(()=>{
+        renderDashboard();
+        renderBills();
+        renderStats();
+      });
+    }).catch(err=>{
+      document.getElementById('connStatus').textContent = '🔴 เข้าสู่ระบบไม่สำเร็จ';
+    });
+  } catch(err){
+    document.getElementById('connStatus').textContent = '🔴 เชื่อมต่อ Firebase ไม่สำเร็จ';
+  }
+}
+function attachListeners(){
+  fbDb.ref('config').on('value', snap=>{
+    const val = snap.val();
+    if(val){
+      config = val;
+      if(!Array.isArray(config.menu)) config.menu = [];
+      if(!Array.isArray(config.toppings)) config.toppings = [];
+      document.getElementById('pointsPerCupInput').value = config.pointsPerCup||1;
+      document.getElementById('couponPointCostInput').value = config.couponPointCost||10;
+      document.getElementById('couponDiscountBahtInput').value = config.couponDiscountBaht||20;
+      if(document.getElementById('page-menu').classList.contains('active')) renderMenuPage();
+    }
+  });
+  fbDb.ref('members').on('value', snap=>{
+    members = snap.val() || {};
+    renderMembersList();
+  });
+  fbDb.ref('expenses').on('value', snap=>{
+    expenses = snap.val() || {};
+    renderStats();
+  });
+  fbDb.ref('stock').on('value', snap=>{
+    const val = snap.val();
+    stockRecords = val ? (Array.isArray(val) ? val.filter(Boolean) : Object.values(val)) : [];
+    if(document.getElementById('page-stock').classList.contains('active')) renderStockPage();
+  });
+}
+
+/* ============ โหลดยอดขายเฉพาะช่วงที่ต้องใช้ ============ */
+function loadSalesRange(startStr, endStr){
+  const rangeKey = startStr+'_'+endStr;
+  if(loadedSalesRanges.has(rangeKey)) return Promise.resolve();
+  const startMs = new Date(startStr+'T00:00:00').getTime();
+  const endMs = new Date(endStr+'T23:59:59.999').getTime();
+  return fbDb.ref('sales').orderByKey().startAt(String(startMs)).endAt(String(endMs)).once('value').then(snap=>{
+    const val = snap.val();
+    if(val){
+      const arr = Array.isArray(val) ? val.filter(Boolean) : Object.values(val);
+      arr.forEach(s=>{
+        if(s && s.id!=null){
+          const idx = salesRecords.findIndex(x=>x.id===s.id);
+          if(idx>=0) salesRecords[idx]=s; else salesRecords.push(s);
+        }
+      });
+    }
+    loadedSalesRanges.add(rangeKey);
+  });
+}
+
+/* ============ หน้าหลัก (Dashboard) ============ */
+function renderDashboard(){
+  const today = todayStr();
+  document.getElementById('dashDateLabel').textContent = new Date().toLocaleDateString('th-TH',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+  const todaySales = salesRecords.filter(r=>localDateStr(r.datetime)===today && !r.cancelled);
+  const revenue = todaySales.reduce((s,r)=>s+r.total,0);
+  const cups = todaySales.reduce((s,r)=>s+r.items.reduce((a,l)=>a+l.qty,0),0);
+  document.getElementById('dRevenue').textContent = revenue.toFixed(2);
+  document.getElementById('dCups').textContent = cups;
+  document.getElementById('dBills').textContent = todaySales.length;
+  document.getElementById('dAvg').textContent = todaySales.length ? (revenue/todaySales.length).toFixed(2) : '0.00';
+
+  // เมนูขายดีวันนี้
+  const menuMap = {};
+  todaySales.forEach(sale=>sale.items.forEach(l=>{
+    if(!menuMap[l.name]) menuMap[l.name] = {qty:0, revenue:0};
+    menuMap[l.name].qty += l.qty;
+    menuMap[l.name].revenue += lineBaseTotal(l);
+  }));
+  const topMenu = Object.entries(menuMap).sort((a,b)=>b[1].qty-a[1].qty).slice(0,5);
+  document.getElementById('dTopMenuBody').innerHTML = topMenu.length ? topMenu.map(([name,d],i)=>
+    '<tr><td>'+(i+1)+'</td><td>'+escapeHtml(name)+'</td><td class="num">'+d.qty+'</td><td class="num">'+d.revenue.toFixed(2)+'</td></tr>'
+  ).join('') : '<tr><td colspan="4" class="empty-msg">ยังไม่มีการขายวันนี้</td></tr>';
+
+  // ช่วงเวลาขายดีวันนี้
+  const hourMap = {};
+  todaySales.forEach(sale=>{
+    const h = new Date(sale.datetime).getHours();
+    hourMap[h] = (hourMap[h]||0)+1;
+  });
+  const hourRows = Object.entries(hourMap).sort((a,b)=>b[1]-a[1]).slice(0,6);
+  document.getElementById('dHourBody').innerHTML = hourRows.length ? hourRows.map(([h,c])=>
+    '<tr><td>'+String(h).padStart(2,'0')+':00 น.</td><td class="num">'+c+'</td></tr>'
+  ).join('') : '<tr><td colspan="2" class="empty-msg">ยังไม่มีข้อมูล</td></tr>';
+
+  // กราฟยอดขาย 7 วันล่าสุด
+  const days = [];
+  for(let i=6;i>=0;i--){ const d=new Date(); d.setDate(d.getDate()-i); days.push(dateStr(d)); }
+  const dayRevenue = days.map(d=>salesRecords.filter(r=>localDateStr(r.datetime)===d && !r.cancelled).reduce((s,r)=>s+r.total,0));
+  const maxRev = Math.max(1, ...dayRevenue);
+  const chart = document.getElementById('dChart');
+  chart.innerHTML = days.map((d,i)=>{
+    const val = dayRevenue[i];
+    const h = Math.max(3, Math.round((val/maxRev)*110));
+    const lbl = new Date(d).toLocaleDateString('th-TH',{day:'2-digit',month:'2-digit'});
+    return '<div class="bar-col"><div class="bar-val">'+(val>0?val.toFixed(0):'')+'</div><div class="bar-fill" style="height:'+h+'px;"></div><div class="bar-lbl">'+lbl+'</div></div>';
+  }).join('');
+}
+
+/* ============ ใบเสร็จ ============ */
+document.getElementById('billLoadBtn').onclick = ()=>{
+  const s = document.getElementById('billStart').value;
+  const e = document.getElementById('billEnd').value;
+  if(!s || !e){ showToast('กรุณาเลือกช่วงวันที่'); return; }
+  loadSalesRange(s, e).then(()=>{ renderBills(); showToast('โหลดข้อมูลสำเร็จ'); });
+};
+document.getElementById('billSearch').addEventListener('input', renderBills);
+function renderBills(){
+  const s = document.getElementById('billStart').value || todayStr();
+  const e = document.getElementById('billEnd').value || todayStr();
+  const q = (document.getElementById('billSearch').value||'').trim().toLowerCase();
+  let list = salesRecords.filter(r=>{ const ds = localDateStr(r.datetime); return ds>=s && ds<=e; });
+  if(q){
+    list = list.filter(r=>{
+      const billNo = String(r.queueNo||'').padStart(3,'0');
+      const itemNames = r.items.map(l=>l.name).join(' ').toLowerCase();
+      return billNo.includes(q) || itemNames.includes(q);
+    });
+  }
+  list.sort((a,b)=>b.id-a.id);
+  const body = document.getElementById('billListBody');
+  body.innerHTML = list.map(sale=>{
+    const timeStr = new Date(sale.datetime).toLocaleString('th-TH',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
+    const itemsShort = sale.items.map(l=>l.name+' x'+l.qty).join(', ');
+    let badge = '<span class="badge badge-ok">ปกติ</span>';
+    if(sale.cancelled) badge = '<span class="badge badge-cancelled">ยกเลิก</span>';
+    else if(sale.codPending) badge = '<span class="badge badge-pending">รอเก็บเงิน</span>';
+    if(sale.edited) badge += ' <span class="badge badge-edited">แก้ไขแล้ว</span>';
+    return '<tr class="clickable" data-saleid="'+sale.id+'"><td>#'+String(sale.queueNo||'-').padStart(3,'0')+'</td><td>'+timeStr+'</td>'+
+      '<td>'+escapeHtml(itemsShort)+'</td><td>'+escapeHtml(sale.payment||'')+'</td>'+
+      '<td class="num">'+sale.total.toFixed(2)+'</td><td>'+badge+'</td></tr>';
+  }).join('') || '<tr><td colspan="6" class="empty-msg">ไม่พบบิลในช่วงนี้</td></tr>';
+  body.querySelectorAll('tr[data-saleid]').forEach(row=>{
+    row.onclick = ()=>openBillModal(Number(row.dataset.saleid));
+  });
+}
+let currentEditSale = null;
+function openBillModal(saleId){
+  const sale = salesRecords.find(s=>s.id===saleId);
+  if(!sale) return;
+  currentEditSale = sale;
+  document.getElementById('billModalTitle').textContent = 'บิล #'+String(sale.queueNo||'-').padStart(3,'0')+' — '+new Date(sale.datetime).toLocaleString('th-TH');
+  const body = document.getElementById('billModalBody');
+  let itemsHtml = sale.items.map((l,idx)=>
+    '<div class="item-edit-row">'+
+      '<input data-idx="'+idx+'" data-field="name" value="'+escapeHtml(l.name)+'">'+
+      '<input data-idx="'+idx+'" data-field="qty" type="number" min="1" value="'+l.qty+'">'+
+      '<input data-idx="'+idx+'" data-field="lineTotal" type="number" min="0" step="0.01" value="'+l.lineTotal.toFixed(2)+'">'+
+    '</div>'
+  ).join('');
+  body.innerHTML =
+    '<div style="font-size:11.5px;color:var(--muted);margin-bottom:6px;">รายการ (ชื่อ / จำนวน / ยอดรวมบรรทัด)</div>'+
+    itemsHtml+
+    '<div class="field" style="margin:12px 0;"><label>ช่องทางชำระเงิน</label><select id="editPayment" style="width:100%;padding:9px 10px;border:1.5px solid var(--line);border-radius:8px;">'+
+      ['เงินสด','โอน/พร้อมเพย์','เก็บเงินปลายทาง','อื่นๆ'].map(p=>'<option'+(sale.payment&&sale.payment.startsWith(p)?' selected':'')+'>'+p+'</option>').join('')+
+    '</select></div>'+
+    '<div class="field" style="margin-bottom:12px;"><label>หมายเหตุ</label><input id="editNote" type="text" value="'+escapeHtml(sale.note||'')+'" style="width:100%;padding:9px 10px;border:1.5px solid var(--line);border-radius:8px;"></div>'+
+    (sale.memberId ? '<div style="font-size:12px;color:var(--muted);">สมาชิก: '+escapeHtml(sale.memberName||sale.memberId)+' • แต้มที่ได้ '+(sale.pointsEarned||0)+' • คูปองที่ใช้ '+(sale.couponsUsed||0)+'</div>' : '')+
+    (sale.edited ? '<div style="font-size:11px;color:var(--muted-soft);margin-top:8px;">แก้ไขล่าสุด: '+new Date(sale.editedAt).toLocaleString('th-TH')+'</div>' : '');
+  const cancelBtn = document.getElementById('billCancelToggleBtn');
+  cancelBtn.textContent = sale.cancelled ? 'ยกเลิกการยกเลิก (คืนเป็นปกติ)' : 'ทำเครื่องหมายว่ายกเลิก';
+  document.getElementById('billModal').classList.add('open');
+}
+document.getElementById('billCloseBtn').onclick = ()=>document.getElementById('billModal').classList.remove('open');
+document.getElementById('billCancelToggleBtn').onclick = ()=>{
+  if(!currentEditSale) return;
+  currentEditSale.cancelled = !currentEditSale.cancelled;
+  currentEditSale.queueStatus = currentEditSale.cancelled ? 'cancelled' : 'done';
+  currentEditSale.edited = true;
+  currentEditSale.editedAt = new Date().toISOString();
+  fbDb.ref('sales/'+currentEditSale.id).set(currentEditSale).then(()=>{
+    showToast(currentEditSale.cancelled ? 'ทำเครื่องหมายยกเลิกแล้ว' : 'คืนสถานะเป็นปกติแล้ว');
+    document.getElementById('billModal').classList.remove('open');
+    renderBills(); renderStats(); renderDashboard();
+  }).catch(()=>showToast('บันทึกไม่สำเร็จ'));
+};
+document.getElementById('billSaveBtn').onclick = ()=>{
+  if(!currentEditSale) return;
+  const rows = document.querySelectorAll('#billModalBody .item-edit-row');
+  let newSubtotal = 0;
+  rows.forEach(row=>{
+    const idx = Number(row.querySelector('[data-field="name"]').dataset.idx);
+    const name = row.querySelector('[data-field="name"]').value.trim();
+    const qty = Math.max(1, Number(row.querySelector('[data-field="qty"]').value)||1);
+    const lineTotal = Math.max(0, Number(row.querySelector('[data-field="lineTotal"]').value)||0);
+    currentEditSale.items[idx].name = name;
+    currentEditSale.items[idx].qty = qty;
+    currentEditSale.items[idx].lineTotal = lineTotal;
+    newSubtotal += lineTotal;
+  });
+  const vatPercent = currentEditSale.vatPercent || 0;
+  const vat = vatPercent>0 ? newSubtotal*vatPercent/100 : 0;
+  currentEditSale.subtotal = newSubtotal;
+  currentEditSale.vat = vat;
+  currentEditSale.total = newSubtotal + vat;
+  currentEditSale.payment = document.getElementById('editPayment').value;
+  currentEditSale.note = document.getElementById('editNote').value.trim();
+  currentEditSale.edited = true;
+  currentEditSale.editedAt = new Date().toISOString();
+  fbDb.ref('sales/'+currentEditSale.id).set(currentEditSale).then(()=>{
+    showToast('บันทึกการแก้ไขบิลแล้ว');
+    document.getElementById('billModal').classList.remove('open');
+    renderBills(); renderStats(); renderDashboard();
+  }).catch(()=>showToast('บันทึกไม่สำเร็จ'));
+};
+
+/* ============ สมาชิก ============ */
+document.getElementById('memberSearchInput').addEventListener('input', renderMembersList);
+function renderMembersList(){
+  const q = (document.getElementById('memberSearchInput').value||'').trim().toLowerCase();
+  const list = Object.values(members).filter(m=>!q || (m.name||'').toLowerCase().includes(q) || (m.phone||'').includes(q))
+    .sort((a,b)=>(b.points||0)-(a.points||0));
+  document.getElementById('membersListBody').innerHTML = list.map(m=>
+    '<tr class="clickable" data-phone="'+escapeHtml(m.phone)+'"><td>'+escapeHtml(m.name)+'</td><td>'+escapeHtml(m.phone)+'</td><td class="num">'+(m.points||0)+'</td></tr>'
+  ).join('') || '<tr><td colspan="3" class="empty-msg">'+(Object.keys(members).length?'ไม่พบสมาชิกที่ค้นหา':'ยังไม่มีสมาชิกในระบบ')+'</td></tr>';
+  document.querySelectorAll('#membersListBody tr[data-phone]').forEach(row=>{
+    row.onclick = ()=>openMemberHistory(row.dataset.phone);
+  });
+}
+let currentHistoryMemberPhone = null;
+function openMemberHistory(phone){
+  currentHistoryMemberPhone = phone;
+  const m = members[phone];
+  if(!m) return;
+  const card = document.getElementById('memberHistoryCard');
+  card.style.display = '';
+  document.getElementById('memberHistoryTitle').textContent = 'ประวัติแต้ม & การซื้อ — '+m.name+' ('+m.phone+') • ยอดปัจจุบัน '+(m.points||0)+' แต้ม';
+  const actionBtnsHtml = '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;">'+
+    '<button type="button" id="memberAdjustOpenBtn" class="btn btn-ghost">✏️ ปรับแต้มมือ</button>'+
+    '<button type="button" id="memberEditOpenBtn" class="btn btn-ghost">📝 แก้ไขข้อมูล</button>'+
+    '<button type="button" id="memberDeleteBtn" class="btn btn-danger">🗑️ ลบสมาชิก</button>'+
+    '</div>';
+  const box = document.getElementById('memberHistoryBox');
+  box.innerHTML = '<div class="empty-msg">⏳ กำลังโหลด...</div>'+actionBtnsHtml;
+  bindMemberActionBtns(phone);
+  fbDb.ref('pointTx').orderByChild('memberId').equalTo(phone).once('value').then(snap=>{
+    if(currentHistoryMemberPhone !== phone) return;
+    const val = snap.val() || {};
+    const txs = Object.values(val).sort((a,b)=>new Date(b.createdAt)-new Date(a.createdAt));
+    const typeLabel = {earn:'ได้แต้ม (ซื้อของ)', redeem_discount:'ใช้คูปอง', adjust:'ปรับมือ', settle:'สรุปบิล'};
+    const rows = txs.length ? txs.map(t=>{
+      const d = new Date(t.createdAt);
+      const dStr = d.toLocaleDateString('th-TH',{day:'2-digit',month:'2-digit',year:'2-digit'})+' '+d.toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit'});
+      const sign = t.amount>0?'+':'';
+      return '<tr><td>'+dStr+'</td><td>'+(typeLabel[t.type]||t.type)+'</td><td class="num" style="color:'+(t.amount<0?'var(--danger)':'var(--accent-dark)')+';font-weight:700;">'+sign+t.amount+'</td><td>'+escapeHtml(t.note||'')+'</td></tr>';
+    }).join('') : '<tr><td colspan="4" class="empty-msg">ยังไม่มีประวัติ</td></tr>';
+    box.innerHTML = '<table><thead><tr><th>วันที่</th><th>ประเภท</th><th class="num">แต้ม</th><th>หมายเหตุ</th></tr></thead><tbody>'+rows+'</tbody></table>'+actionBtnsHtml;
+    bindMemberActionBtns(phone);
+  }).catch(()=>{ box.innerHTML = '<div class="empty-msg">โหลดประวัติไม่สำเร็จ</div>'+actionBtnsHtml; bindMemberActionBtns(phone); });
+}
+function bindMemberActionBtns(phone){
+  document.getElementById('memberAdjustOpenBtn').onclick = ()=>openMemberAdjustModal(phone);
+  document.getElementById('memberEditOpenBtn').onclick = ()=>openMemberEditModal(phone);
+  document.getElementById('memberDeleteBtn').onclick = ()=>deleteMember(phone);
+}
+function openMemberAdjustModal(phone){
+  const m = members[phone];
+  if(!m) return;
+  document.getElementById('memberAdjustWho').textContent = m.name+' ('+m.phone+') — ยอดปัจจุบัน '+(m.points||0)+' แต้ม';
+  document.getElementById('memberAdjustAmount').value='';
+  document.getElementById('memberAdjustReason').value='';
+  document.getElementById('memberAdjustModal').dataset.phone = phone;
+  document.getElementById('memberAdjustModal').classList.add('open');
+}
+document.getElementById('memberAdjustCancelBtn').onclick = ()=>document.getElementById('memberAdjustModal').classList.remove('open');
+document.getElementById('memberAdjustConfirmBtn').onclick = ()=>{
+  const phone = document.getElementById('memberAdjustModal').dataset.phone;
+  const amount = parseInt(document.getElementById('memberAdjustAmount').value,10);
+  const reason = document.getElementById('memberAdjustReason').value.trim();
+  if(!phone || !amount){ showToast('กรุณากรอกจำนวนแต้ม'); return; }
+  if(!reason){ showToast('กรุณากรอกเหตุผล'); return; }
+  fbDb.ref('members/'+phone+'/points').transaction(cur=>{
+    const now=(cur||0)+amount;
+    return now<0 ? undefined : now;
+  }).then(result=>{
+    if(!result.committed){ showToast('ปรับแต้มไม่สำเร็จ (แต้มอาจติดลบ)'); return; }
+    const pointsAfter = result.snapshot.val();
+    return fbDb.ref('pointTx/'+genId()).set({
+      memberId: phone, billId: null, type:'adjust', amount,
+      pointsAfter, createdAt:new Date().toISOString(), note: reason
+    }).then(()=>{
+      document.getElementById('memberAdjustModal').classList.remove('open');
+      showToast('ปรับแต้มสำเร็จ');
+      openMemberHistory(phone);
+    });
+  }).catch(()=>showToast('ปรับแต้มไม่สำเร็จ'));
+};
+function openMemberEditModal(phone){
+  const m = members[phone];
+  if(!m) return;
+  document.getElementById('memberEditName').value = m.name;
+  document.getElementById('memberEditPhone').value = m.phone;
+  document.getElementById('memberEditPoints').value = m.points||0;
+  document.getElementById('memberEditModal').dataset.origPhone = phone;
+  document.getElementById('memberEditModal').classList.add('open');
+}
+function deleteMember(phone){
+  const m = members[phone];
+  if(!m) return;
+  if(!confirm('ลบสมาชิก "'+m.name+'" ('+m.phone+') ออกจากระบบหรือไม่?\n\nแต้มคงเหลือ '+(m.points||0)+' แต้มจะหายไปด้วย การลบนี้ย้อนกลับไม่ได้')) return;
+  fbDb.ref('members/'+phone).remove().then(()=>{
+    document.getElementById('memberHistoryCard').style.display = 'none';
+    showToast('ลบสมาชิกแล้ว');
+  }).catch(()=>showToast('ลบไม่สำเร็จ'));
+}
+document.getElementById('memberEditCancelBtn').onclick = ()=>document.getElementById('memberEditModal').classList.remove('open');
+document.getElementById('memberEditConfirmBtn').onclick = ()=>{
+  const origPhone = document.getElementById('memberEditModal').dataset.origPhone;
+  const orig = members[origPhone];
+  if(!orig) return;
+  const newName = document.getElementById('memberEditName').value.trim();
+  const newPhone = normalizePhone(document.getElementById('memberEditPhone').value);
+  const newPoints = parseInt(document.getElementById('memberEditPoints').value,10) || 0;
+  if(!newName){ showToast('กรุณากรอกชื่อ'); return; }
+  if(newPhone.length<9 || newPhone.length>10){ showToast('เบอร์โทรไม่ถูกต้อง'); return; }
+  if(newPhone !== origPhone && members[newPhone]){ showToast('เบอร์นี้มีสมาชิกอยู่แล้ว'); return; }
+  const btn = document.getElementById('memberEditConfirmBtn');
+  btn.disabled = true;
+  const pointsDelta = newPoints - (orig.points||0);
+  const pointsStep = pointsDelta !== 0
+    ? fbDb.ref('members/'+origPhone+'/points').transaction(cur=>{
+        const now=(cur||0)+pointsDelta;
+        return now<0 ? undefined : now;
+      }).then(result=>{
+        if(!result.committed) throw new Error('ปรับแต้มไม่สำเร็จ');
+        return fbDb.ref('pointTx/'+genId()).set({
+          memberId: origPhone, billId: null, type:'adjust', amount: pointsDelta,
+          pointsAfter: result.snapshot.val(), createdAt: new Date().toISOString(), note: 'แก้ไขข้อมูลสมาชิก'
+        });
+      })
+    : Promise.resolve();
+  pointsStep.then(()=>{
+    if(newPhone === origPhone){
+      return fbDb.ref('members/'+origPhone+'/name').set(newName);
+    }
+    return fbDb.ref('members/'+origPhone).once('value').then(snap=>{
+      const current = snap.val() || orig;
+      const moved = Object.assign({}, current, { name:newName, phone:newPhone });
+      return fbDb.ref('members/'+newPhone).set(moved).then(()=>fbDb.ref('members/'+origPhone).remove());
+    });
+  }).then(()=>{
+    btn.disabled = false;
+    document.getElementById('memberEditModal').classList.remove('open');
+    showToast('บันทึกการแก้ไขแล้ว');
+    openMemberHistory(newPhone);
+  }).catch(()=>{
+    btn.disabled = false;
+    showToast('บันทึกไม่สำเร็จ ลองใหม่อีกครั้ง');
+  });
+};
+document.getElementById('memberAddBtn').onclick = ()=>{
+  document.getElementById('memberRegName').value='';
+  document.getElementById('memberRegPhone').value='';
+  document.getElementById('memberRegisterModal').classList.add('open');
+};
+document.getElementById('memberRegCancelBtn').onclick = ()=>document.getElementById('memberRegisterModal').classList.remove('open');
+document.getElementById('memberRegConfirmBtn').onclick = ()=>{
+  const name = document.getElementById('memberRegName').value.trim();
+  const phone = normalizePhone(document.getElementById('memberRegPhone').value);
+  if(!name){ showToast('กรุณากรอกชื่อ'); return; }
+  if(phone.length<9 || phone.length>10){ showToast('เบอร์โทรไม่ถูกต้อง'); return; }
+  if(members[phone]){ showToast('เบอร์นี้เป็นสมาชิกอยู่แล้ว'); return; }
+  fbDb.ref('members/'+phone).set({name, phone, points:0, createdAt:new Date().toISOString()}).then(()=>{
+    document.getElementById('memberRegisterModal').classList.remove('open');
+    showToast('ลงทะเบียนสำเร็จ');
+  }).catch(()=>showToast('ลงทะเบียนไม่สำเร็จ'));
+};
+
+/* ============ เมนู (ดูอย่างเดียว) ============ */
+function renderMenuPage(){
+  const box = document.getElementById('menuListBox');
+  const menu = config.menu||[];
+  if(!menu.length){ box.innerHTML = '<div class="empty-msg">ยังไม่มีเมนูในระบบ</div>'; return; }
+  box.innerHTML = menu.map(m=>{
+    const img = m.image ? '<img src="'+m.image+'" alt="">' : '<div class="ph">🧋</div>';
+    return '<div class="menu-card-ro">'+img+
+      '<div><div class="nm">'+escapeHtml(m.name)+'</div><div class="cat">'+escapeHtml(m.category||'')+'</div></div>'+
+      '<div class="pr">'+Number(m.price||0).toFixed(0)+' ฿</div></div>';
+  }).join('');
+}
+
+/* ============ สต็อก (ดูอย่างเดียว) ============ */
+function renderStockPage(){
+  const body = document.getElementById('stockListBody');
+  const list = stockRecords.slice().sort((a,b)=>b.date.localeCompare(a.date));
+  body.innerHTML = list.map(rec=>
+    '<tr class="clickable" data-date="'+escapeHtml(rec.date)+'"><td>'+escapeHtml(rec.date)+'</td><td>'+escapeHtml(rec.recordedBy||'-')+'</td>'+
+    '<td>'+(rec.savedAt ? new Date(rec.savedAt).toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit'}) : '-')+'</td>'+
+    '<td>ดูรายละเอียด →</td></tr>'
+  ).join('') || '<tr><td colspan="4" class="empty-msg">ยังไม่มีการบันทึกสต็อก</td></tr>';
+  body.querySelectorAll('tr[data-date]').forEach(row=>{
+    row.onclick = ()=>{
+      const rec = stockRecords.find(r=>r.date===row.dataset.date);
+      if(!rec) return;
+      document.getElementById('stockDetailCard').style.display = '';
+      document.getElementById('stockDetailTitle').textContent = 'สต็อกวันที่ '+rec.date+' (บันทึกโดย '+(rec.recordedBy||'-')+')';
+      const items = rec.items||{};
+      document.getElementById('stockDetailBody').innerHTML = Object.entries(items).map(([k,v])=>
+        '<tr><td>'+escapeHtml(k)+'</td><td class="num">'+escapeHtml(v)+'</td></tr>'
+      ).join('') || '<tr><td colspan="2" class="empty-msg">ไม่มีข้อมูล</td></tr>';
+    };
+  });
+}
+
+/* ============ รายงาน ============ */
+document.querySelectorAll('#statQuick .chip').forEach(chip=>{
+  chip.onclick = ()=>{
+    document.querySelectorAll('#statQuick .chip').forEach(c=>c.classList.remove('active'));
+    chip.classList.add('active');
+    const end = new Date();
+    let start = new Date();
+    if(chip.dataset.range==='week') start.setDate(start.getDate()-6);
+    if(chip.dataset.range==='month') start.setDate(start.getDate()-29);
+    document.getElementById('statStart').value = dateStr(start);
+    document.getElementById('statEnd').value = dateStr(end);
+  };
+});
+document.getElementById('statLoadBtn').onclick = ()=>{
+  const s = document.getElementById('statStart').value;
+  const e = document.getElementById('statEnd').value;
+  if(!s || !e){ showToast('กรุณาเลือกช่วงวันที่'); return; }
+  loadSalesRange(s, e).then(()=>{ renderStats(); showToast('โหลดข้อมูลสำเร็จ'); });
+};
+function getStatRangeSales(){
+  const s = document.getElementById('statStart').value || todayStr();
+  const e = document.getElementById('statEnd').value || todayStr();
+  return salesRecords.filter(r=>{ const ds = localDateStr(r.datetime); return ds>=s && ds<=e && !r.cancelled; });
+}
+function renderStats(){
+  const filtered = getStatRangeSales();
+  const revenue = filtered.reduce((s,r)=>s+r.total,0);
+  const cups = filtered.reduce((s,r)=>s+r.items.reduce((a,l)=>a+l.qty,0),0);
+  document.getElementById('statRevenue').textContent = revenue.toFixed(2);
+  document.getElementById('statCups').textContent = cups;
+  document.getElementById('statBills').textContent = filtered.length;
+
+  const s = document.getElementById('statStart').value || todayStr();
+  const e = document.getElementById('statEnd').value || todayStr();
+  const expList = Object.values(expenses).filter(x=>x.date>=s && x.date<=e);
+  const totalExpense = expList.reduce((s2,x)=>s2+(Number(x.amount)||0),0);
+  document.getElementById('statExpense').textContent = totalExpense.toFixed(2);
+  document.getElementById('statNet').textContent = (revenue-totalExpense).toFixed(2);
+
+  const menuMap = {};
+  filtered.forEach(sale=>sale.items.forEach(l=>{
+    if(!menuMap[l.name]) menuMap[l.name] = {qty:0, revenue:0};
+    menuMap[l.name].qty += l.qty;
+    menuMap[l.name].revenue += lineBaseTotal(l);
+  }));
+  document.getElementById('statMenuBody').innerHTML = Object.entries(menuMap).sort((a,b)=>b[1].qty-a[1].qty)
+    .map(([name,d])=>'<tr><td>'+escapeHtml(name)+'</td><td class="num">'+d.qty+'</td><td class="num">'+d.revenue.toFixed(2)+'</td></tr>').join('')
+    || '<tr><td colspan="3" class="empty-msg">ไม่มีข้อมูล</td></tr>';
+
+  const priceMap = {};
+  filtered.forEach(sale=>sale.items.forEach(l=>{
+    const p = Number(lineMenuPrice(l)||0).toFixed(0);
+    if(!priceMap[p]) priceMap[p] = {qty:0, revenue:0};
+    priceMap[p].qty += l.qty;
+    priceMap[p].revenue += lineBaseTotal(l);
+  }));
+  document.getElementById('statPriceBody').innerHTML = Object.entries(priceMap).sort((a,b)=>Number(a[0])-Number(b[0]))
+    .map(([p,d])=>'<tr><td>'+p+' บาท</td><td class="num">'+d.qty+'</td><td class="num">'+d.revenue.toFixed(2)+'</td></tr>').join('')
+    || '<tr><td colspan="3" class="empty-msg">ไม่มีข้อมูล</td></tr>';
+
+  const sweetMap = {};
+  filtered.forEach(sale=>sale.items.forEach(l=>{
+    const key = l.sweet || 'ไม่ระบุ';
+    sweetMap[key] = (sweetMap[key]||0) + l.qty;
+  }));
+  document.getElementById('statSweetBody').innerHTML = Object.entries(sweetMap).sort((a,b)=>b[1]-a[1])
+    .map(([k,q])=>'<tr><td>'+escapeHtml(k)+'</td><td class="num">'+q+'</td></tr>').join('')
+    || '<tr><td colspan="2" class="empty-msg">ไม่มีข้อมูล</td></tr>';
+
+  const hourMap = {};
+  filtered.forEach(sale=>{
+    const h = new Date(sale.datetime).getHours();
+    if(!hourMap[h]) hourMap[h] = {count:0, revenue:0};
+    hourMap[h].count++;
+    hourMap[h].revenue += sale.total;
+  });
+  document.getElementById('statHourBody').innerHTML = Object.entries(hourMap).sort((a,b)=>Number(a[0])-Number(b[0]))
+    .map(([h,d])=>'<tr><td>'+String(h).padStart(2,'0')+':00 น.</td><td class="num">'+d.count+'</td><td class="num">'+d.revenue.toFixed(2)+'</td></tr>').join('')
+    || '<tr><td colspan="3" class="empty-msg">ไม่มีข้อมูล</td></tr>';
+
+  renderExpenseTable(expList);
+}
+function renderExpenseTable(list){
+  const body = document.getElementById('expenseBody');
+  const sorted = list.slice().sort((a,b)=>b.date.localeCompare(a.date));
+  body.innerHTML = sorted.map(x=>
+    '<tr><td>'+escapeHtml(x.date)+'</td><td>'+escapeHtml(x.category)+'</td><td>'+escapeHtml(x.note||'')+'</td>'+
+    '<td class="num">'+Number(x.amount).toFixed(2)+'</td>'+
+    '<td><button class="btn btn-ghost" data-expid="'+x.id+'" style="padding:5px 10px;font-size:11px;" onclick="deleteExpense(this)">ลบ</button></td></tr>'
+  ).join('') || '<tr><td colspan="5" class="empty-msg">ยังไม่มีรายจ่ายในช่วงนี้</td></tr>';
+}
+function deleteExpense(btn){
+  const id = btn.dataset.expid;
+  if(!confirm('ลบรายจ่ายนี้หรือไม่?')) return;
+  fbDb.ref('expenses/'+id).remove().then(()=>showToast('ลบแล้ว'));
+}
+document.getElementById('expenseAddBtn').onclick = ()=>{
+  document.getElementById('expDate').value = todayStr();
+  document.getElementById('expCategory').value = 'วัตถุดิบ';
+  document.getElementById('expNote').value = '';
+  document.getElementById('expAmount').value = '';
+  document.getElementById('expenseModal').classList.add('open');
+};
+document.getElementById('expCancelBtn').onclick = ()=>document.getElementById('expenseModal').classList.remove('open');
+document.getElementById('expSaveBtn').onclick = ()=>{
+  const date = document.getElementById('expDate').value;
+  const category = document.getElementById('expCategory').value;
+  const note = document.getElementById('expNote').value.trim();
+  const amount = Number(document.getElementById('expAmount').value);
+  if(!date || !amount){ showToast('กรุณากรอกวันที่และจำนวนเงิน'); return; }
+  const id = genId();
+  fbDb.ref('expenses/'+id).set({ id, date, category, note, amount, createdAt: new Date().toISOString() }).then(()=>{
+    document.getElementById('expenseModal').classList.remove('open');
+    showToast('บันทึกรายจ่ายแล้ว');
+  }).catch(()=>showToast('บันทึกไม่สำเร็จ'));
+};
+document.getElementById('exportCsvBtn').onclick = ()=>{
+  const s = document.getElementById('statStart').value || todayStr();
+  const e = document.getElementById('statEnd').value || todayStr();
+  const list = salesRecords.filter(r=>{ const ds=localDateStr(r.datetime); return ds>=s && ds<=e; });
+  const rows = [['เลขบิล','วันที่','เวลา','รายการ','จำนวนแก้ว','ช่องทางชำระ','ยอดรวม','สมาชิก','แต้มที่ได้','สถานะ']];
+  list.forEach(sale=>{
+    const d = new Date(sale.datetime);
+    rows.push([
+      sale.queueNo||'', dateStr(d), d.toLocaleTimeString('th-TH'),
+      sale.items.map(l=>l.name+' x'+l.qty).join(' | '),
+      sale.items.reduce((a,l)=>a+l.qty,0),
+      sale.payment||'', sale.total.toFixed(2),
+      sale.memberName||'', sale.pointsEarned||0,
+      sale.cancelled?'ยกเลิก':(sale.codPending?'รอเก็บเงิน':'ปกติ')
+    ]);
+  });
+  const csv = rows.map(r=>r.map(c=>'"'+String(c).replace(/"/g,'""')+'"').join(',')).join('\n');
+  const blob = new Blob(['\uFEFF'+csv], {type:'text/csv;charset=utf-8;'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'hopchafe-sales-'+s+'_to_'+e+'.csv';
+  a.click();
+  showToast('ดาวน์โหลดไฟล์ CSV แล้ว');
+};
+
+/* ============ ตั้งค่า ============ */
+document.getElementById('savePointsRateBtn').onclick = ()=>{
+  config.pointsPerCup = parseFloat(document.getElementById('pointsPerCupInput').value) || 0;
+  config.couponPointCost = parseInt(document.getElementById('couponPointCostInput').value, 10) || 10;
+  config.couponDiscountBaht = parseFloat(document.getElementById('couponDiscountBahtInput').value) || 0;
+  fbDb.ref('config').set(config).then(()=>showToast('บันทึกอัตราแต้มแล้ว')).catch(()=>showToast('บันทึกไม่สำเร็จ'));
+};
+</script>
+</body>
+</html>
